@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <meta name="description" content="Odysee for Samsung TV"/>
+
+    <title>Odysee TV</title>
+
+    <link rel="stylesheet" type="text/css" href="css/style.css"/>
+    <script type="text/javascript" src="$WEBAPIS/webapis/webapis.js"></script>
+    <script src="js/config/constants.js"></script>
+    <script src="js/input/keys.js"></script>
+    <script src="js/platform/tizen.js"></script>
+    <script src="js/services/http.js"></script>
+    <script src="js/services/odyseeApi.js"></script>
+    <script src="js/focus/focusManager.js"></script>
+    <script src="js/player/playerService.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/main.js"></script>
+</head>
+
+<body>
+    <div id="appRoot" class="app-root">
+        <header class="topbar">
+            <div class="brand-wrap">
+                <img src="assets/logo.svg" alt="Odysee" class="brand-logo" />
+            </div>
+            <h1 id="pageTitle" class="page-title is-hidden"></h1>
+            <div class="topbar-right">
+                <div class="top-actions">
+                    <button id="followChannelButton" class="top-action focusable hidden" data-zone="topbar" data-index="0">Follow</button>
+                    <button id="searchButton" class="top-action focusable" data-zone="topbar" data-index="1">Search</button>
+                    <button id="signInButton" class="top-action focusable" data-zone="topbar" data-index="2">Sign In</button>
+                    <button id="accountBadge" type="button" class="top-action account-badge focusable hidden" data-zone="topbar" data-index="3" aria-label="Open channel">
+                        <img id="accountAvatar" class="account-avatar hidden" alt="" />
+                        <span id="accountInitial" class="account-initial">A</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="layout">
+            <aside class="sidebar">
+                <div id="categoryList" class="list"></div>
+            </aside>
+
+            <section class="content">
+                <div class="content-header">
+                    <h2 id="contentTitle">Feed</h2>
+                    <p id="contentMeta" class="content-meta"></p>
+                </div>
+                <div id="videoGrid" class="video-grid"></div>
+                <div id="emptyState" class="empty hidden">No videos available for this category.</div>
+            </section>
+        </main>
+    </div>
+
+    <div id="playerLayer" class="player-layer hidden">
+        <div class="player-top-scrim" aria-hidden="true"></div>
+        <div class="player-bottom-scrim" aria-hidden="true"></div>
+        <div class="player-header">
+            <div class="player-header-top">
+                <h2 id="playerTitle" class="player-title">Now Playing</h2>
+                <div id="playerReactionActions" class="player-reactions hidden">
+                    <button id="playerFollowButton" class="player-reaction-btn player-follow-btn focusable hidden">Follow</button>
+                    <button id="playerFireButton" class="player-reaction-btn focusable">
+                        <svg class="player-reaction-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M15.45 22.65C17.25 16.65 12.15 12.75 12.15 12.75C12.15 12.75 9.00001 18.15 9.60001 22.65C7.20001 21.45 5.55001 19.8 4.80001 17.7C3.60001 14.55 4.50001 11.1 5.25001 9C5.85001 10.2 7.80001 12.15 7.80001 12.15L7.95001 10.5C8.55001 2.25 12.6 0.9 14.4 0.75C14.4 1.8 14.7 4.8 17.1 7.95C18.75 10.05 20.55 12.45 20.4 16.5C20.1 20.1 17.4 21.9 15.45 22.65Z" />
+                        </svg>
+                        <span class="player-reaction-label">Fire</span>
+                    </button>
+                    <button id="playerSlimeButton" class="player-reaction-btn focusable">
+                        <svg class="player-reaction-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M5.09998 23.25C2.84998 23.25 1.64998 20.55 3.14998 18.9C4.19998 17.85 8.24998 17.1 7.04998 14.7C6.14998 12.9 3.59998 15.75 2.09998 15C1.34998 14.7 1.19998 13.5 1.79998 12.75C2.39998 11.85 3.29998 12 4.19998 12.15C5.84998 12.45 7.94998 11.7 7.49998 9.60003C6.89998 7.35003 4.34998 6.45003 3.44998 4.35003C2.69998 2.25003 4.64998 -0.299968 6.89998 1.05003C8.69998 2.10003 8.39997 5.25003 9.29997 6.90003C10.2 8.40003 12 9.00003 13.2 7.65003C14.55 6.30003 14.55 3.15003 16.65 2.70003C18.45 2.25003 20.4 4.05003 19.5 5.85003C18.45 7.80003 15.15 7.80003 14.55 10.05C14.1 11.7 15.45 11.85 16.65 11.4C17.4 11.1 18.6 10.35 19.5 10.65C20.55 11.1 20.7 12.45 19.95 13.2C18.6 14.25 16.65 12.6 15.45 14.25C13.95 16.35 17.1 17.7 18.15 18.9C19.8 20.7 18.3 22.8 16.05 22.8C14.1 22.8 13.65 20.7 13.2 19.05C12.6 16.95 9.89997 15.3 8.54997 18C7.79997 19.8 8.24998 23.25 5.09998 23.25Z" />
+                        </svg>
+                        <span class="player-reaction-label">Slime</span>
+                    </button>
+                </div>
+            </div>
+            <div class="player-meta-row">
+                <button id="playerChannelButton" class="player-channel focusable hidden">
+                    <span class="player-channel-avatar-wrap">
+                        <img id="playerChannelAvatar" class="player-channel-avatar hidden" alt="" />
+                        <span id="playerChannelInitial" class="player-channel-initial">?</span>
+                    </span>
+                    <span id="playerChannelName" class="player-channel-name"></span>
+                </button>
+                <p id="playerMeta" class="player-meta"></p>
+            </div>
+        </div>
+        <video id="videoElement" class="video-element"></video>
+        <div id="playerControls" class="player-controls">
+            <div class="player-progress-row">
+                <div id="playerTransportState" class="player-transport-state" aria-hidden="true">
+                    <svg id="playerTransportPlay" class="player-transport-icon-svg hidden" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M8 6L18 12L8 18V6Z" />
+                    </svg>
+                    <svg id="playerTransportPause" class="player-transport-icon-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M7 6H10V18H7V6Z" />
+                        <path d="M14 6H17V18H14V6Z" />
+                    </svg>
+                    <span id="playerLoadingSpinner" class="player-loading-spinner hidden"></span>
+                </div>
+                <div class="player-progress-track">
+                    <div id="playerProgressFill" class="player-progress-fill"></div>
+                    <div id="playerProgressThumb" class="player-progress-thumb"></div>
+                </div>
+            </div>
+            <div class="player-controls-row">
+                <p id="playerTime" class="player-time">00:00 / 00:00</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+
+    <div id="searchModal" class="search-modal hidden">
+        <div class="search-panel">
+            <h2 class="search-title">Search Videos</h2>
+            <input id="searchInput" class="search-input" type="text" maxlength="120" placeholder="Type search query" />
+            <div class="search-actions">
+                <button id="searchSubmit" class="search-btn">Search</button>
+                <button id="searchCancel" class="search-btn search-btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="authModal" class="search-modal hidden">
+        <div class="search-panel auth-panel">
+            <h2 id="authTitle" class="search-title">Sign In</h2>
+            <p id="authMessage" class="search-hint auth-message">Enter your email to receive a sign-in link.</p>
+            <div id="authPendingStatus" class="auth-pending hidden">
+                <span class="auth-spinner" aria-hidden="true"></span>
+                <span>Waiting for email confirmation...</span>
+            </div>
+            <input id="authEmailInput" class="search-input" type="email" maxlength="180" placeholder="you@example.com" />
+            <div id="authChannelList" class="auth-channel-list hidden" tabindex="-1"></div>
+            <div class="search-actions">
+                <button id="authPrimary" class="search-btn">Send Link</button>
+                <button id="authCancel" class="search-btn search-btn-secondary">Cancel</button>
+                <button id="authSignOut" class="search-btn search-btn-danger hidden">Sign Out</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

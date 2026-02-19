@@ -1,0 +1,17 @@
+# --- Tizen build/sign artifacts ---
+.sign/
+*.wgt
+
+# --- Eclipse / Tizen Studio noise ---
+.settings/
+.project
+.tproject
+
+# --- OS junk ---
+.DS_Store
+Thumbs.db
+node_modules/
+dist/
+build/
+.env
+*.log
