@@ -839,6 +839,59 @@
         });
     }
 
+    function signInWithPassword(config, email, password) {
+        var normalizedEmail = String(email || "").trim().toLowerCase();
+        var rawPassword = typeof password === "string" ? password : String(password || "");
+        if (!normalizedEmail) {
+            return Promise.reject(new Error("Email is required"));
+        }
+        if (!rawPassword) {
+            return Promise.reject(new Error("Password is required"));
+        }
+
+        return ensureAnonymousAuth(config, false).then(function (authToken) {
+            if (!authToken) {
+                throw new Error("Unable to initialize auth token");
+            }
+            return postAuthEndpoint(config, "/user/exists", {
+                auth_token: authToken,
+                email: normalizedEmail
+            }, "auth:user/exists").then(function (existsData) {
+                var exists = parseExistsResult(existsData);
+                if (!exists.exists) {
+                    throw new Error("No account found for this email");
+                }
+                if (!exists.hasPassword) {
+                    throw new Error("Password sign-in is not enabled for this account. Use magic link.");
+                }
+                return postAuthEndpoint(config, "/user/signin", {
+                    auth_token: authToken,
+                    email: normalizedEmail,
+                    password: rawPassword
+                }, "auth:user/signin").catch(function (error) {
+                    var message = getErrorMessage(error);
+                    if (/HTTP 409/i.test(message)) {
+                        throw new Error("Email verification is still pending. Use the magic link option.");
+                    }
+                    if (/HTTP 400|HTTP 401|HTTP 403/i.test(message)) {
+                        throw new Error("Incorrect email or password.");
+                    }
+                    throw error;
+                }).then(function (data) {
+                    var parsedAuth = parseAuthPayload(data);
+                    if (parsedAuth.token) {
+                        saveStoredAuth(parsedAuth.token, parsedAuth.uid);
+                    }
+                    var fallbackUser = normalizeUser(data);
+                    fallbackUser.isAuthenticated = true;
+                    return checkSignedInUser(config).then(function (user) {
+                        return user || fallbackUser;
+                    });
+                });
+            });
+        });
+    }
+
     function normalizeChannelListRows(result) {
         if (result && Array.isArray(result.items)) {
             return result.items;
@@ -3340,6 +3393,7 @@
         resolveStreamUrl: resolveStreamUrl,
         resolveStreamCandidates: resolveStreamCandidates,
         requestMagicLink: requestMagicLink,
+        signInWithPassword: signInWithPassword,
         checkSignedInUser: checkSignedInUser,
         resolveChannelContext: resolveChannelContext,
         listMyChannels: listMyChannels,

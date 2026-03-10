@@ -1,6 +1,7 @@
 (function (global) {
     var Odysee = global.Odysee || (global.Odysee = {});
-    var hasAbortController = typeof global.AbortController !== "undefined";
+    var AbortControllerCtor = typeof global.AbortController === "function" ? global.AbortController : null;
+    var hasAbortController = !!AbortControllerCtor;
     var debug = Odysee.debug || { enabled: false, verbose: false, log: function () {}, warn: function () {}, error: function () {} };
 
     function sleep(ms) {
@@ -63,7 +64,7 @@
                 if (debug.verbose) {
                     debug.log("[http] request start", label, "attempt", (attempt + 1) + "/" + (retries + 1), "timeoutMs", timeoutMs);
                 }
-                var controller = hasAbortController ? new AbortController() : null;
+                var controller = hasAbortController ? new AbortControllerCtor() : null;
                 var requestOptions = {
                     method: method,
                     headers: headers,
@@ -122,7 +123,7 @@
 
         function tryMethod(method) {
             return new Promise(function (resolve, reject) {
-                var controller = hasAbortController ? new AbortController() : null;
+                var controller = hasAbortController ? new AbortControllerCtor() : null;
                 var requestOptions = {
                     method: method,
                     redirect: "follow"

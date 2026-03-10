@@ -45,7 +45,10 @@
         this.currentSearchQuery = "";
         this.authUser = null;
         this.authStage = "collect";
+        this.authMode = "magic-link";
         this.authPendingEmail = "";
+        this.authEmailDraft = "";
+        this.authPasswordDraft = "";
         this.authBusy = false;
         this.authPollTimer = null;
         this.authChannels = [];
@@ -120,8 +123,10 @@
             authMessage: document.getElementById("authMessage"),
             authPendingStatus: document.getElementById("authPendingStatus"),
             authEmailInput: document.getElementById("authEmailInput"),
+            authPasswordInput: document.getElementById("authPasswordInput"),
             authChannelList: document.getElementById("authChannelList"),
             authPrimary: document.getElementById("authPrimary"),
+            authModeToggle: document.getElementById("authModeToggle"),
             authCancel: document.getElementById("authCancel"),
             authSignOut: document.getElementById("authSignOut")
         };
@@ -205,6 +210,11 @@
                 self.handleAuthPrimaryAction();
             });
         }
+        if (this.nodes.authModeToggle) {
+            this.nodes.authModeToggle.addEventListener("click", function () {
+                self.toggleAuthMode();
+            });
+        }
         if (this.nodes.authCancel) {
             this.nodes.authCancel.addEventListener("click", function () {
                 self.handleAuthCancelAction();
@@ -216,7 +226,22 @@
             });
         }
         if (this.nodes.authEmailInput) {
+            this.nodes.authEmailInput.addEventListener("input", function () {
+                self.authEmailDraft = String(self.nodes.authEmailInput.value || "");
+            });
             this.nodes.authEmailInput.addEventListener("keydown", function (event) {
+                if (event.keyCode === KEY.ENTER) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    self.handleAuthPrimaryAction();
+                }
+            });
+        }
+        if (this.nodes.authPasswordInput) {
+            this.nodes.authPasswordInput.addEventListener("input", function () {
+                self.authPasswordDraft = String(self.nodes.authPasswordInput.value || "");
+            });
+            this.nodes.authPasswordInput.addEventListener("keydown", function (event) {
                 if (event.keyCode === KEY.ENTER) {
                     event.preventDefault();
                     event.stopPropagation();
@@ -665,6 +690,9 @@
         }
         if (!this.videos.length) {
             this.nodes.videoGrid.innerHTML = "";
+            if (this.nodes.emptyState) {
+                this.nodes.emptyState.textContent = this.channelContext ? "Nothing here... yet!" : "No videos available for this category.";
+            }
             this.nodes.emptyState.classList.remove("hidden");
             this.nodes.contentMeta.textContent = "0 videos";
             return;
@@ -1997,7 +2025,7 @@
         var previousAuthKey = this.getAuthUserIdentity(this.authUser);
         this.authUser = user || null;
         var nextAuthKey = this.getAuthUserIdentity(this.authUser);
-        if (!this.authUser) {
+        if (this.authUser === null) {
             this.watchLaterAvailable = false;
             this.ownedChannelIds = {};
             this.ownedChannelsLoaded = false;
@@ -2912,6 +2940,60 @@
         this.clearPlayerHeaderFocus();
     };
 
+    App.prototype.syncAuthDraftFields = function () {
+        if (this.nodes.authEmailInput) {
+            this.authEmailDraft = String(this.nodes.authEmailInput.value || "");
+        }
+        if (this.nodes.authPasswordInput) {
+            this.authPasswordDraft = String(this.nodes.authPasswordInput.value || "");
+        }
+    };
+
+    App.prototype.setAuthMode = function (mode) {
+        var nextMode = mode === "password" ? "password" : "magic-link";
+        this.syncAuthDraftFields();
+        if (this.authMode === nextMode) {
+            return;
+        }
+        this.authMode = nextMode;
+        if (this.authMode !== "password") {
+            this.authPasswordDraft = "";
+            if (this.authDialogFocus === 1) {
+                this.authDialogFocus = 0;
+            }
+        }
+        if (this.authStage === "collect") {
+            this.renderAuthDialogState();
+        }
+    };
+
+    App.prototype.toggleAuthMode = function () {
+        if (this.authStage !== "collect") {
+            return;
+        }
+        this.setAuthMode(this.authMode === "password" ? "magic-link" : "password");
+    };
+
+    App.prototype.completeAuthSignIn = function (user) {
+        if (!user) {
+            return;
+        }
+        this.authEmailDraft = String(user.email || this.authEmailDraft || "").trim();
+        this.authPasswordDraft = "";
+        if (this.nodes.authPasswordInput) {
+            this.nodes.authPasswordInput.value = "";
+        }
+        this.setAuthUser(user);
+        this.authStage = "signed-in";
+        this.authPendingEmail = "";
+        this.setStatus("Signed in as " + (user.email || "account"));
+        this.showToast("Signed in successfully.");
+        if (this.authOpen) {
+            this.closeSignInDialog();
+        }
+        this.openFollowingHome();
+    };
+
     App.prototype.openSignInDialog = function () {
         if (!this.nodes.authModal || !this.nodes.authPrimary) {
             this.showToast("Sign-in UI unavailable.");
@@ -2922,6 +3004,9 @@
         }
 
         this.authOpen = true;
+        if (this.authPendingEmail && !this.authEmailDraft) {
+            this.authEmailDraft = this.authPendingEmail;
+        }
         if (this.authUser) {
             this.authStage = "signed-in";
         } else if (this.authPendingEmail) {
@@ -3101,8 +3186,13 @@
         if (!this.authOpen) {
             return;
         }
+        this.syncAuthDraftFields();
         this.authOpen = false;
         this.authBusy = false;
+        this.authPasswordDraft = "";
+        if (this.nodes.authPasswordInput) {
+            this.nodes.authPasswordInput.value = "";
+        }
         this.stopAuthPolling();
         this.clearAuthDialogFocus();
         if (this.nodes.authModal) {
@@ -3116,15 +3206,23 @@
             return;
         }
 
-        var showEmail = this.authStage === "collect";
+        var showCollect = this.authStage === "collect";
+        var showEmail = showCollect;
+        var showPassword = showCollect && this.authMode === "password";
         var showPending = this.authStage === "pending";
         var showChannelList = this.authStage === "switch-channel";
         this.nodes.authEmailInput.classList.toggle("auth-email-hidden", !showEmail);
+        if (this.nodes.authPasswordInput) {
+            this.nodes.authPasswordInput.classList.toggle("auth-password-hidden", !showPassword);
+        }
         if (this.nodes.authPendingStatus) {
             this.nodes.authPendingStatus.classList.toggle("hidden", !showPending);
         }
         if (this.nodes.authChannelList) {
             this.nodes.authChannelList.classList.toggle("hidden", !showChannelList);
+        }
+        if (this.nodes.authModeToggle) {
+            this.nodes.authModeToggle.classList.toggle("hidden", !showCollect);
         }
         if (this.nodes.authSignOut) {
             this.nodes.authSignOut.classList.add("hidden");
@@ -3159,11 +3257,27 @@
         } else {
             this.stopAuthPolling();
             this.nodes.authTitle.textContent = "Sign In";
-            this.nodes.authMessage.textContent = "Enter your email to receive a secure sign-in link.";
-            this.nodes.authPrimary.textContent = "Send Link";
+            if (this.authMode === "password") {
+                this.nodes.authMessage.textContent = "Enter your email and password to sign in directly.";
+                this.nodes.authPrimary.textContent = "Sign In";
+            } else {
+                this.nodes.authMessage.textContent = "Enter your email to receive a secure sign-in link.";
+                this.nodes.authPrimary.textContent = "Send Link";
+            }
+            if (this.nodes.authModeToggle) {
+                this.nodes.authModeToggle.textContent = this.authMode === "password" ? "Use Magic Link" : "Use Password";
+            }
             this.nodes.authCancel.textContent = "Cancel";
-            this.nodes.authEmailInput.value = this.authPendingEmail || "";
-            this.authDialogFocus = 0;
+            this.nodes.authEmailInput.value = this.authEmailDraft || this.authPendingEmail || "";
+            if (this.nodes.authPasswordInput) {
+                this.nodes.authPasswordInput.value = this.authPasswordDraft || "";
+            }
+            if (this.authMode !== "password" && this.authDialogFocus === 1) {
+                this.authDialogFocus = 0;
+            }
+            if (this.authDialogFocus !== 0 && this.authDialogFocus !== 1 && this.authDialogFocus !== 2 && this.authDialogFocus !== 3 && this.authDialogFocus !== 4) {
+                this.authDialogFocus = 0;
+            }
         }
 
         this.updateAuthDialogFocus();
@@ -3189,9 +3303,14 @@
                 }
                 return true;
             }
-            if (this.authStage === "collect" && this.authDialogFocus === 0) {
-                this.authDialogFocus = 1;
-                this.updateAuthDialogFocus();
+            if (this.authStage === "collect") {
+                if (this.authDialogFocus === 0) {
+                    this.authDialogFocus = this.authMode === "password" ? 1 : 2;
+                    this.updateAuthDialogFocus();
+                } else if (this.authMode === "password" && this.authDialogFocus === 1) {
+                    this.authDialogFocus = 2;
+                    this.updateAuthDialogFocus();
+                }
             }
             return true;
         }
@@ -3207,9 +3326,19 @@
                 }
                 return true;
             }
-            if (this.authStage === "collect" && this.authDialogFocus !== 0) {
-                this.authDialogFocus = 0;
-                this.updateAuthDialogFocus();
+            if (this.authStage === "collect") {
+                if (this.authMode === "password") {
+                    if (this.authDialogFocus === 1) {
+                        this.authDialogFocus = 0;
+                        this.updateAuthDialogFocus();
+                    } else if (this.authDialogFocus >= 2) {
+                        this.authDialogFocus = 1;
+                        this.updateAuthDialogFocus();
+                    }
+                } else if (this.authDialogFocus !== 0) {
+                    this.authDialogFocus = 0;
+                    this.updateAuthDialogFocus();
+                }
             }
             return true;
         }
@@ -3229,6 +3358,16 @@
                     this.updateAuthDialogFocus();
                 } else if (this.authDialogFocus === 1) {
                     this.authDialogFocus = 0;
+                    this.updateAuthDialogFocus();
+                }
+                return true;
+            }
+            if (this.authStage === "collect") {
+                if (this.authDialogFocus === 4) {
+                    this.authDialogFocus = this.isAuthModeToggleInteractive() ? 3 : 2;
+                    this.updateAuthDialogFocus();
+                } else if (this.authDialogFocus === 3) {
+                    this.authDialogFocus = 2;
                     this.updateAuthDialogFocus();
                 }
                 return true;
@@ -3259,6 +3398,16 @@
                 }
                 return true;
             }
+            if (this.authStage === "collect") {
+                if (this.authDialogFocus === 2 && this.isAuthModeToggleInteractive()) {
+                    this.authDialogFocus = 3;
+                    this.updateAuthDialogFocus();
+                } else if ((this.authDialogFocus === 2 && !this.isAuthModeToggleInteractive()) || this.authDialogFocus === 3) {
+                    this.authDialogFocus = 4;
+                    this.updateAuthDialogFocus();
+                }
+                return true;
+            }
             if (this.authDialogFocus === 1) {
                 this.authDialogFocus = 2;
                 this.updateAuthDialogFocus();
@@ -3266,7 +3415,11 @@
             return true;
         }
         if (code === KEY.ENTER) {
-            if (this.authDialogFocus === 2) {
+            if (this.authStage === "collect" && this.authDialogFocus === 4) {
+                this.handleAuthCancelAction();
+            } else if (this.authStage === "collect" && this.authDialogFocus === 3 && this.isAuthModeToggleInteractive()) {
+                this.toggleAuthMode();
+            } else if (this.authDialogFocus === 2 && this.authStage !== "collect") {
                 this.handleAuthCancelAction();
             } else if (this.authDialogFocus === 3 && this.authStage === "signed-in") {
                 this.signOutCurrentUser();
@@ -3287,15 +3440,28 @@
         return !this.nodes.authPrimary.classList.contains("auth-primary-hidden");
     };
 
+    App.prototype.isAuthModeToggleInteractive = function () {
+        if (!this.nodes.authModeToggle) {
+            return false;
+        }
+        return !this.nodes.authModeToggle.classList.contains("hidden");
+    };
+
     App.prototype.clearAuthDialogFocus = function () {
         if (this.nodes.authEmailInput) {
             this.nodes.authEmailInput.classList.remove("is-focused");
+        }
+        if (this.nodes.authPasswordInput) {
+            this.nodes.authPasswordInput.classList.remove("is-focused");
         }
         if (this.nodes.authChannelList) {
             this.nodes.authChannelList.classList.remove("is-focused");
         }
         if (this.nodes.authPrimary) {
             this.nodes.authPrimary.classList.remove("is-focused");
+        }
+        if (this.nodes.authModeToggle) {
+            this.nodes.authModeToggle.classList.remove("is-focused");
         }
         if (this.nodes.authCancel) {
             this.nodes.authCancel.classList.remove("is-focused");
@@ -3350,11 +3516,42 @@
             return;
         }
 
-        if (this.authStage === "collect" && this.authDialogFocus === 0) {
-            if (this.nodes.authEmailInput) {
-                this.nodes.authEmailInput.classList.add("is-focused");
-                this.nodes.authEmailInput.focus();
-                this.nodes.authEmailInput.select();
+        if (this.authStage === "collect") {
+            if (this.authMode !== "password" && this.authDialogFocus === 1) {
+                this.authDialogFocus = 0;
+            }
+            if (this.authDialogFocus === 0) {
+                if (this.nodes.authEmailInput) {
+                    this.nodes.authEmailInput.classList.add("is-focused");
+                    this.nodes.authEmailInput.focus();
+                    this.nodes.authEmailInput.select();
+                }
+                return;
+            }
+            if (this.authMode === "password" && this.authDialogFocus === 1) {
+                if (this.nodes.authPasswordInput) {
+                    this.nodes.authPasswordInput.classList.add("is-focused");
+                    this.nodes.authPasswordInput.focus();
+                    this.nodes.authPasswordInput.select();
+                }
+                return;
+            }
+            if (this.authDialogFocus === 4) {
+                if (this.nodes.authCancel) {
+                    this.nodes.authCancel.classList.add("is-focused");
+                    this.nodes.authCancel.focus();
+                }
+                return;
+            }
+            if (this.authDialogFocus === 3 && this.isAuthModeToggleInteractive()) {
+                this.nodes.authModeToggle.classList.add("is-focused");
+                this.nodes.authModeToggle.focus();
+                return;
+            }
+            this.authDialogFocus = 2;
+            if (this.nodes.authPrimary) {
+                this.nodes.authPrimary.classList.add("is-focused");
+                this.nodes.authPrimary.focus();
             }
             return;
         }
@@ -3390,6 +3587,10 @@
             this.applySelectedDefaultChannel();
             return;
         }
+        if (this.authMode === "password") {
+            this.startPasswordSignIn();
+            return;
+        }
         this.startMagicLinkSignIn();
     };
 
@@ -3399,11 +3600,21 @@
             this.renderAuthDialogState();
             return;
         }
+        if (this.authStage === "pending") {
+            this.stopAuthPolling();
+            this.authStage = "collect";
+            this.authPendingEmail = "";
+            this.renderAuthDialogState();
+            return;
+        }
         this.closeSignInDialog();
     };
 
     App.prototype.startMagicLinkSignIn = function () {
-        var email = String(this.nodes.authEmailInput && this.nodes.authEmailInput.value || "").trim().toLowerCase();
+        this.syncAuthDraftFields();
+        this.authMode = "magic-link";
+        this.authPasswordDraft = "";
+        var email = String(this.authEmailDraft || "").trim().toLowerCase();
         if (!isValidEmail(email)) {
             this.showToast("Enter a valid email.");
             return;
@@ -3415,6 +3626,7 @@
         Odysee.api.requestMagicLink(this.config, email).then(function () {
             self.authBusy = false;
             self.authPendingEmail = email;
+            self.authEmailDraft = email;
             self.authStage = "pending";
             self.renderAuthDialogState();
             self.setStatus("Sign-in email sent.");
@@ -3434,21 +3646,60 @@
         });
     };
 
+    App.prototype.startPasswordSignIn = function () {
+        this.syncAuthDraftFields();
+        var email = String(this.authEmailDraft || "").trim().toLowerCase();
+        var password = String(this.authPasswordDraft || "");
+        if (!isValidEmail(email)) {
+            this.showToast("Enter a valid email.");
+            this.authDialogFocus = 0;
+            this.updateAuthDialogFocus();
+            return;
+        }
+        if (!password) {
+            this.showToast("Enter your password.");
+            this.authDialogFocus = 1;
+            this.updateAuthDialogFocus();
+            return;
+        }
+
+        var self = this;
+        this.authBusy = true;
+        this.nodes.authMessage.textContent = "Signing in...";
+        Odysee.api.signInWithPassword(this.config, email, password).then(function (user) {
+            self.authBusy = false;
+            self.completeAuthSignIn(user);
+        }).catch(function (error) {
+            var message = getErrorMessage(error);
+            self.authBusy = false;
+            self.authStage = "collect";
+            self.renderAuthDialogState();
+            self.setStatus("Sign-in failed: " + message);
+            if (/no account|not found|404/i.test(message)) {
+                self.showToast("No account found for that email.");
+                self.nodes.authMessage.textContent = "No account found. Create it on Odysee web first.";
+            } else if (/password sign-in is not enabled|use magic link/i.test(message)) {
+                self.showToast("Use the magic link option for this account.");
+                self.nodes.authMessage.textContent = "Password sign-in is not enabled for this account.";
+            } else if (/incorrect email or password/i.test(message)) {
+                self.showToast("Incorrect email or password.");
+                self.nodes.authMessage.textContent = "Check your email and password, then try again.";
+            } else if (/verification/i.test(message)) {
+                self.showToast("Finish email verification first.");
+                self.nodes.authMessage.textContent = message;
+            } else {
+                self.showToast("Could not sign in with password.");
+            }
+        });
+    };
+
     App.prototype.verifyMagicLinkSignIn = function (showToastWhenPending) {
         var self = this;
         this.authBusy = !!showToastWhenPending;
         return Odysee.api.checkSignedInUser(this.config).then(function (user) {
             self.authBusy = false;
             if (user) {
-                self.setAuthUser(user);
-                self.authStage = "signed-in";
-                self.authPendingEmail = "";
-                self.setStatus("Signed in as " + (user.email || "account"));
-                self.showToast("Signed in successfully.");
-                if (self.authOpen) {
-                    self.closeSignInDialog();
-                }
-                self.openFollowingHome();
+                self.completeAuthSignIn(user);
                 return;
             }
             if (self.authStage !== "pending") {
@@ -3498,7 +3749,9 @@
             self.authBusy = false;
             self.setAuthUser(null);
             self.authStage = "collect";
+            self.authMode = "magic-link";
             self.authPendingEmail = "";
+            self.authPasswordDraft = "";
             self.renderAuthDialogState();
             self.setStatus("Signed out.");
             self.showToast("Signed out.");

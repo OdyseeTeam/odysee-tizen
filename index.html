@@ -135,9 +135,11 @@
                 <span>Waiting for email confirmation...</span>
             </div>
             <input id="authEmailInput" class="search-input" type="email" maxlength="180" placeholder="you@example.com" />
+            <input id="authPasswordInput" class="search-input auth-password-hidden" type="password" maxlength="180" placeholder="Password" />
             <div id="authChannelList" class="auth-channel-list hidden" tabindex="-1"></div>
             <div class="search-actions">
                 <button id="authPrimary" class="search-btn">Send Link</button>
+                <button id="authModeToggle" class="search-btn search-btn-secondary">Use Password</button>
                 <button id="authCancel" class="search-btn search-btn-secondary">Cancel</button>
                 <button id="authSignOut" class="search-btn search-btn-danger hidden">Sign Out</button>
             </div>
